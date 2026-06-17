@@ -10,6 +10,7 @@ from .models import Payment, Coupon, CouponUsage
 from orders.models import Order
 from authentication.permissions import IsAdminOrSuperAdmin
 
+
 # ══════════════════════════════════════════════
 # POST /api/payments/initiate/
 # ══════════════════════════════════════════════
@@ -26,7 +27,16 @@ class InitiatePaymentView(APIView):
                 'message': 'order_id is required.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        order = get_object_or_404(Order, pk=order_id, client=request.user)
+        # Convert to UUID
+        try:
+            order_uuid = uuid.UUID(str(order_id))
+        except (ValueError, AttributeError):
+            return Response({
+                'success': False,
+                'message': 'Invalid order_id format.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        order = get_object_or_404(Order, pk=order_uuid, client=request.user)
 
         existing = Payment.objects.filter(order=order, status='Success').first()
         if existing:
@@ -78,9 +88,18 @@ class ConfirmPaymentView(APIView):
                 'message': 'payment_id and transaction_id are required.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
+        # Convert to UUID
+        try:
+            payment_uuid = uuid.UUID(str(payment_id))
+        except (ValueError, AttributeError):
+            return Response({
+                'success': False,
+                'message': 'Invalid payment_id format.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
         payment = get_object_or_404(
             Payment,
-            pk=payment_id,
+            pk=payment_uuid,
             client=request.user,
             transaction_id=transaction_id
         )
@@ -100,13 +119,19 @@ class ConfirmPaymentView(APIView):
         order.status = 'Active'
         order.save()
 
-        # Auto generate invoice (non-blocking)
+        # Auto generate invoice
         try:
-            from books.models import Invoice
+            from accounting.models import Invoice
             Invoice.objects.create(
+                invoice_number='INV-' + str(order.order_number).replace('YBS-', ''),
                 order=order,
                 client=order.client,
-                invoice_number='INV-' + str(order.order_number).replace('YBS-', ''),
+                line_items=[{
+                    'description': f"{order.service.name} - {order.package.name}",
+                    'quantity': 1,
+                    'rate': str(order.base_amount),
+                    'amount': str(order.base_amount),
+                }],
                 subtotal=order.base_amount,
                 gst_amount=order.gst_amount,
                 discount=order.discount,
@@ -114,15 +139,9 @@ class ConfirmPaymentView(APIView):
                 status='Paid',
                 paid_at=timezone.now(),
                 due_date=timezone.now().date(),
-                line_items=[{
-                    'description': f"{order.service.name} - {order.package.name}",
-                    'quantity': 1,
-                    'rate': str(order.base_amount),
-                    'amount': str(order.base_amount),
-                }]
             )
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Invoice creation error: {e}")
 
         return Response({
             'success': True,
@@ -300,7 +319,7 @@ class ApplyCouponView(APIView):
 
         final_amount = order_amount - discount
 
-        # Save usage record and increment counter
+        # Save usage and increment counter
         CouponUsage.objects.create(coupon=coupon, user=request.user)
         coupon.used_count += 1
         coupon.save()
@@ -351,7 +370,16 @@ class UseWalletView(APIView):
                 'message': 'order_id and amount are required.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        order = get_object_or_404(Order, pk=order_id, client=request.user)
+        # Convert to UUID
+        try:
+            order_uuid = uuid.UUID(str(order_id))
+        except (ValueError, AttributeError):
+            return Response({
+                'success': False,
+                'message': 'Invalid order_id format.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        order = get_object_or_404(Order, pk=order_uuid, client=request.user)
         amount_to_use = Decimal(str(amount_to_use))
 
         if request.user.wallet_balance < amount_to_use:

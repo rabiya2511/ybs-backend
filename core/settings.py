@@ -43,8 +43,9 @@ INSTALLED_APPS = [
     'corsheaders',
     'authentication',
     'services',
-    'orders',  
-    'payments', 
+    'orders',
+    'payments',
+    'accounting',
 ]
 
 MIDDLEWARE = [
