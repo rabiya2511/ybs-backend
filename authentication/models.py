@@ -43,6 +43,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     gstin = models.CharField(max_length=15, blank=True, null=True)
     pan = models.CharField(max_length=10, blank=True, null=True)
     referral_code = models.CharField(max_length=10, unique=True, blank=True)
+    wallet_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_verified = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
