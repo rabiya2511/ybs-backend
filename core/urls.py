@@ -1,8 +1,22 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
+    # Django admin panel
     path('admin/', admin.site.urls),
+
+    # Authentication APIs
     path('api/auth/', include('authentication.urls')),
-    path('api/services/', include('services.urls')), 
+
+    # Services & Packages APIs
+    path('api/services/', include('services.urls')),
+
+    # Orders APIs
+    path('api/orders/', include('orders.urls')),
 ]
+
+# Serve uploaded files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

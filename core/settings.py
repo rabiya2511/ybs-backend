@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'authentication',
     'services',
+    'orders',  
 ]
 
 MIDDLEWARE = [
@@ -138,3 +139,6 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
 }
 AUTH_USER_MODEL = 'authentication.User'
+# Media files (uploaded documents)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
