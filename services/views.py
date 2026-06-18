@@ -191,14 +191,14 @@ class FeaturedServicesView(APIView):
         services = Service.objects.filter(is_featured=True, is_active=True)
         data = []
         for s in services:
-            data.append({
+           data.append({
                 'id': str(s.id),
                 'name': s.name,
-                'slug': s.slug,
                 'category': s.category,
-                'short_description': s.short_description,
+                'description': s.description[:100] if s.description else '',
                 'icon': s.icon,
                 'is_featured': s.is_featured,
+                'starting_price': str(s.starting_price),
             })
         return Response({
             'success': True,
@@ -256,10 +256,10 @@ class ServicesByCategoryView(APIView):
             data.append({
                 'id': str(s.id),
                 'name': s.name,
-                'slug': s.slug,
                 'category': s.category,
-                'short_description': s.short_description,
+                'description': s.description[:100] if s.description else '',
                 'icon': s.icon,
+                'starting_price': str(s.starting_price),
             })
         return Response({
             'success': True,

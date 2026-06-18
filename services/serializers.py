@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Service, Package
 
+
 class PackageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Package
@@ -13,11 +14,12 @@ class PackageSerializer(serializers.ModelSerializer):
             'features',
             'is_recommended',
             'is_active',
-            'order',
+            'sort_order',
         ]
 
+
 class ServiceSerializer(serializers.ModelSerializer):
-    packages = PackageSerializer(many=True, read_only=True)  # nested packages inside service
+    packages = PackageSerializer(many=True, read_only=True)
 
     class Meta:
         model = Service
@@ -33,8 +35,8 @@ class ServiceSerializer(serializers.ModelSerializer):
             'created_at',
         ]
 
+
 class ServiceCreateSerializer(serializers.ModelSerializer):
-    # Used only when admin creates or edits a service
     class Meta:
         model = Service
         fields = [
@@ -46,8 +48,8 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
             'is_active',
         ]
 
+
 class PackageCreateSerializer(serializers.ModelSerializer):
-    # Used only when admin creates or edits a package
     class Meta:
         model = Package
         fields = [
@@ -59,5 +61,5 @@ class PackageCreateSerializer(serializers.ModelSerializer):
             'features',
             'is_recommended',
             'is_active',
-            'order',
+            'sort_order',
         ]
