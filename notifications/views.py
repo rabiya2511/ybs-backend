@@ -271,3 +271,30 @@ class CompleteDeadlineView(APIView):
             'success': True,
             'message': f'Deadline "{deadline.title}" marked as completed.'
         })
+# ══════════════════════════════════════════════
+# GET /api/notifications/unread/
+# Client views only unread notifications
+# ══════════════════════════════════════════════
+class UnreadNotificationsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        notifications = Notification.objects.filter(
+            user=request.user,
+            is_read=False
+        )
+        data = []
+        for n in notifications:
+            data.append({
+                'id': str(n.id),
+                'title': n.title,
+                'message': n.message,
+                'notification_type': n.notification_type,
+                'is_read': n.is_read,
+                'created_at': n.created_at,
+            })
+        return Response({
+            'success': True,
+            'count': len(data),
+            'data': data
+        })

@@ -9,6 +9,7 @@ from .views import (
     ComplianceDeadlineListView,
     CreateDeadlineView,
     CompleteDeadlineView,
+    UnreadNotificationsView,
 )
 
 urlpatterns = [
@@ -35,4 +36,6 @@ urlpatterns = [
     path('admin/send/', AdminSendNotificationView.as_view(), name='admin-send'),
     # Admin creates compliance deadline
     path('admin/deadlines/create/', CreateDeadlineView.as_view(), name='create-deadline'),
+
+    path('unread/', UnreadNotificationsView.as_view(), name='unread-notifications'),
 ]
