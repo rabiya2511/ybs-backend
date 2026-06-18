@@ -482,3 +482,177 @@ class AdminCouponListView(APIView):
             'count': len(data),
             'data': data
         })
+# ══════════════════════════════════════════════
+# GET /api/payments/transactions/
+# Client views all their transactions
+# ══════════════════════════════════════════════
+class TransactionListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        payments = Payment.objects.filter(client=request.user)
+
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            payments = payments.filter(status=status_filter)
+
+        data = []
+        for p in payments:
+            data.append({
+                'id': str(p.id),
+                'transaction_id': p.transaction_id,
+                'order_number': p.order.order_number,
+                'service_name': p.order.service.name if p.order.service else '',
+                'amount': str(p.total_amount),
+                'payment_method': p.payment_method,
+                'status': p.status,
+                'razorpay_order_id': p.razorpay_order_id,
+                'razorpay_payment_id': p.razorpay_payment_id,
+                'created_at': p.created_at,
+            })
+        return Response({
+            'success': True,
+            'count': len(data),
+            'data': data
+        })
+
+
+# ══════════════════════════════════════════════
+# GET /api/payments/transactions/<id>/
+# Client views single transaction detail
+# ══════════════════════════════════════════════
+class TransactionDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        payment = get_object_or_404(Payment, pk=pk, client=request.user)
+        return Response({
+            'success': True,
+            'data': {
+                'id': str(payment.id),
+                'transaction_id': payment.transaction_id,
+                'order_number': payment.order.order_number,
+                'service_name': payment.order.service.name if payment.order.service else '',
+                'package_name': payment.order.package.name if payment.order.package else '',
+                'amount': str(payment.amount),
+                'gst_amount': str(payment.gst_amount),
+                'total_amount': str(payment.total_amount),
+                'payment_method': payment.payment_method,
+                'status': payment.status,
+                'transaction_id': payment.transaction_id,
+                'razorpay_order_id': payment.razorpay_order_id,
+                'razorpay_payment_id': payment.razorpay_payment_id,
+                'refund_id': payment.refund_id,
+                'refund_amount': str(payment.refund_amount) if payment.refund_amount else None,
+                'refund_reason': payment.refund_reason,
+                'refunded_at': payment.refunded_at,
+                'notes': payment.notes,
+                'created_at': payment.created_at,
+            }
+        })
+
+
+# ══════════════════════════════════════════════
+# POST /api/payments/verify/
+# Verify payment signature (mock)
+# ══════════════════════════════════════════════
+class VerifyPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        payment_id = request.data.get('payment_id')
+        transaction_id = request.data.get('transaction_id')
+
+        if not payment_id or not transaction_id:
+            return Response({
+                'success': False,
+                'message': 'payment_id and transaction_id are required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            payment = Payment.objects.get(
+                pk=payment_id,
+                client=request.user,
+                transaction_id=transaction_id
+            )
+        except Payment.DoesNotExist:
+            return Response({
+                'success': False,
+                'message': 'Payment not found or does not belong to you.'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({
+            'success': True,
+            'message': 'Payment verified successfully.',
+            'data': {
+                'transaction_id': payment.transaction_id,
+                'status': payment.status,
+                'amount': str(payment.total_amount),
+                'order_number': payment.order.order_number,
+                'is_verified': payment.status == 'Success',
+            }
+        })
+
+
+# ══════════════════════════════════════════════
+# POST /api/payments/webhook/razorpay/
+# Razorpay webhook (mock for now)
+# ══════════════════════════════════════════════
+class RazorpayWebhookView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        event = request.data.get('event')
+        payload = request.data.get('payload', {})
+
+        if event == 'payment.captured':
+            payment_entity = payload.get('payment', {}).get('entity', {})
+            razorpay_payment_id = payment_entity.get('id')
+            razorpay_order_id = payment_entity.get('order_id')
+
+            # Only process if we have a valid razorpay_order_id
+            if razorpay_order_id:
+                try:
+                    payment = Payment.objects.get(
+                        razorpay_order_id=razorpay_order_id
+                    )
+                    payment.razorpay_payment_id = razorpay_payment_id
+                    payment.status = 'Success'
+                    payment.save()
+
+                    order = payment.order
+                    order.status = 'Active'
+                    order.save()
+                except Payment.DoesNotExist:
+                    pass
+
+        return Response({'status': 'ok'})
+
+# ══════════════════════════════════════════════
+# POST /api/payments/webhook/stripe/
+# Stripe webhook (mock for now)
+# ══════════════════════════════════════════════
+class StripeWebhookView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        event_type = request.data.get('type')
+
+        if event_type == 'payment_intent.succeeded':
+            payment_intent = request.data.get('data', {}).get('object', {})
+            stripe_payment_id = payment_intent.get('id')
+
+            try:
+                payment = Payment.objects.get(
+                    razorpay_payment_id=stripe_payment_id
+                )
+                payment.status = 'Success'
+                payment.save()
+
+                order = payment.order
+                order.status = 'Active'
+                order.save()
+            except Payment.DoesNotExist:
+                pass
+
+        return Response({'status': 'ok'})
