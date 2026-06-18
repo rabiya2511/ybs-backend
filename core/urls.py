@@ -21,6 +21,8 @@ urlpatterns = [
     path('api/notifications/', include('notifications.urls')),
     # Checkout APIs
      path('api/checkout/', include('checkout.urls')), 
+    # Accounting APIs
+    path('api/accounting/', include('accounting.urls')),
 ]
 
 # Serve uploaded files in development
