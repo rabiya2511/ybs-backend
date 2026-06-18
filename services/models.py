@@ -18,9 +18,10 @@ class Service(models.Model):
     name = models.CharField(max_length=200)
     category = models.CharField(max_length=50, choices=Category.choices)
     description = models.TextField()
-    icon = models.CharField(max_length=10, default='🏢')  # emoji icon
+    icon = models.CharField(max_length=10, default='🏢')
     starting_price = models.DecimalField(max_digits=10, decimal_places=2)
     is_active = models.BooleanField(default=True)
+    is_featured = models.BooleanField(default=False)  # ← add this line
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -41,6 +42,7 @@ class Package(models.Model):
     features = models.JSONField(default=list)  # list of feature strings
     is_recommended = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    is_featured = models.BooleanField(default=False)
     order = models.IntegerField(default=0)  # for drag-drop ordering
     created_at = models.DateTimeField(auto_now_add=True)
 

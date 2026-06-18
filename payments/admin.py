@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Payment
+from .models import Payment, Coupon, CouponUsage
 
 class PaymentAdmin(admin.ModelAdmin):
     list_display = [
@@ -11,4 +11,14 @@ class PaymentAdmin(admin.ModelAdmin):
     ordering = ['-created_at']
     readonly_fields = ['created_at', 'updated_at']
 
+class CouponAdmin(admin.ModelAdmin):
+    list_display = [
+        'code', 'discount_type', 'discount_value',
+        'usage_limit', 'used_count', 'is_active', 'expires_at'
+    ]
+    list_filter = ['discount_type', 'is_active']
+    search_fields = ['code']
+
 admin.site.register(Payment, PaymentAdmin)
+admin.site.register(Coupon, CouponAdmin)
+admin.site.register(CouponUsage)

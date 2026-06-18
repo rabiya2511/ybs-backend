@@ -146,3 +146,152 @@ class PackageUpdateView(APIView):
             'success': True,
             'message': 'Package deleted successfully.'
         })
+# ══════════════════════════════════════════════
+# DELETE /api/services/admin/<id>/delete/
+# Admin deletes a service
+# ══════════════════════════════════════════════
+class ServiceDeleteView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def delete(self, request, pk):
+        service = get_object_or_404(Service, pk=pk)
+        service_name = service.name
+        service.delete()
+        return Response({
+            'success': True,
+            'message': f'Service "{service_name}" deleted successfully.'
+        })
+
+
+# ══════════════════════════════════════════════
+# DELETE /api/services/admin/packages/<id>/delete/
+# Admin deletes a package
+# ══════════════════════════════════════════════
+class PackageDeleteView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def delete(self, request, pk):
+        package = get_object_or_404(Package, pk=pk)
+        package_name = package.name
+        package.delete()
+        return Response({
+            'success': True,
+            'message': f'Package "{package_name}" deleted successfully.'
+        })
+
+
+# ══════════════════════════════════════════════
+# GET /api/services/featured/
+# List featured services
+# ══════════════════════════════════════════════
+class FeaturedServicesView(APIView):
+    permission_classes = []
+
+    def get(self, request):
+        services = Service.objects.filter(is_featured=True, is_active=True)
+        data = []
+        for s in services:
+            data.append({
+                'id': str(s.id),
+                'name': s.name,
+                'slug': s.slug,
+                'category': s.category,
+                'short_description': s.short_description,
+                'icon': s.icon,
+                'is_featured': s.is_featured,
+            })
+        return Response({
+            'success': True,
+            'count': len(data),
+            'data': data
+        })
+
+
+# ══════════════════════════════════════════════
+# GET /api/services/popular/
+# List popular services (by order count)
+# ══════════════════════════════════════════════
+class PopularServicesView(APIView):
+    permission_classes = []
+
+    def get(self, request):
+        from django.db.models import Count
+        services = Service.objects.filter(
+            is_active=True
+        ).annotate(
+            order_count=Count('packages')
+        ).order_by('-order_count')[:6]
+
+        data = []
+        for s in services:
+            data.append({
+                'id': str(s.id),
+                'name': s.name,
+                'category': s.category,
+                'short_description': s.description[:100] if s.description else '',
+                'icon': s.icon,
+                'starting_price': str(s.starting_price),
+            })
+        return Response({
+            'success': True,
+            'count': len(data),
+            'data': data
+        })
+
+
+# ══════════════════════════════════════════════
+# GET /api/services/category/<category>/
+# List services by category
+# ══════════════════════════════════════════════
+class ServicesByCategoryView(APIView):
+    permission_classes = []
+
+    def get(self, request, category):
+        services = Service.objects.filter(
+            category=category,
+            is_active=True
+        )
+        data = []
+        for s in services:
+            data.append({
+                'id': str(s.id),
+                'name': s.name,
+                'slug': s.slug,
+                'category': s.category,
+                'short_description': s.short_description,
+                'icon': s.icon,
+            })
+        return Response({
+            'success': True,
+            'count': len(data),
+            'data': data
+        })
+
+
+# ══════════════════════════════════════════════
+# GET /api/services/<id>/packages/
+# List packages for a specific service
+# ══════════════════════════════════════════════
+class ServicePackagesView(APIView):
+    permission_classes = []
+
+    def get(self, request, pk):
+        service = get_object_or_404(Service, pk=pk)
+        packages = Package.objects.filter(service=service, is_active=True)
+        data = []
+        for p in packages:
+            data.append({
+                'id': str(p.id),
+                'name': p.name,
+                'price': str(p.price),
+                'gst_rate': str(p.gst_rate),
+                'delivery_days': p.delivery_days,
+                'features': p.features,
+                'is_popular': p.is_popular,
+            })
+        return Response({
+            'success': True,
+            'service': service.name,
+            'count': len(data),
+            'data': data
+        })
