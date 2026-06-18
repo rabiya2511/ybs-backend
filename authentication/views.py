@@ -238,3 +238,261 @@ class AdminUserStatusView(APIView):
             'message': f'User status updated to {new_status}',
             'user': UserProfileSerializer(user).data
         })
+from .models import PasswordResetToken, EmailVerificationToken
+from django.utils import timezone
+from datetime import timedelta
+import secrets
+
+# ══════════════════════════════════════════════
+# POST /api/auth/forgot-password/
+# Request a password reset token
+# ══════════════════════════════════════════════
+class ForgotPasswordView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        email = request.data.get('email')
+
+        if not email:
+            return Response({
+                'success': False,
+                'message': 'Email is required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            # Don't reveal if email exists or not
+            return Response({
+                'success': True,
+                'message': 'If this email exists, a reset token has been sent.'
+            })
+
+        # Invalidate old tokens
+        PasswordResetToken.objects.filter(user=user, is_used=False).update(is_used=True)
+
+        # Create new token
+        token = secrets.token_urlsafe(32)
+        PasswordResetToken.objects.create(
+            user=user,
+            token=token,
+            expires_at=timezone.now() + timedelta(hours=1)
+        )
+
+        # In production send email, for now return token in response
+        return Response({
+            'success': True,
+            'message': 'Password reset token generated.',
+            'reset_token': token,  # Remove this in production
+            'expires_in': '1 hour'
+        })
+
+
+# ══════════════════════════════════════════════
+# POST /api/auth/confirm-reset-password/
+# Reset password using token
+# ══════════════════════════════════════════════
+class ConfirmResetPasswordView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        token = request.data.get('token')
+        new_password = request.data.get('new_password')
+
+        if not token or not new_password:
+            return Response({
+                'success': False,
+                'message': 'token and new_password are required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            reset_token = PasswordResetToken.objects.get(
+                token=token,
+                is_used=False
+            )
+        except PasswordResetToken.DoesNotExist:
+            return Response({
+                'success': False,
+                'message': 'Invalid or already used token.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check expiry
+        if reset_token.expires_at < timezone.now():
+            return Response({
+                'success': False,
+                'message': 'Token has expired. Please request a new one.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Set new password
+        user = reset_token.user
+        user.set_password(new_password)
+        user.save()
+
+        # Mark token as used
+        reset_token.is_used = True
+        reset_token.save()
+
+        return Response({
+            'success': True,
+            'message': 'Password reset successfully. Please login with your new password.'
+        })
+
+
+# ══════════════════════════════════════════════
+# POST /api/auth/change-password/
+# Change password while logged in
+# ══════════════════════════════════════════════
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        current_password = request.data.get('current_password')
+        new_password = request.data.get('new_password')
+
+        if not current_password or not new_password:
+            return Response({
+                'success': False,
+                'message': 'current_password and new_password are required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check current password
+        if not request.user.check_password(current_password):
+            return Response({
+                'success': False,
+                'message': 'Current password is incorrect.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        request.user.set_password(new_password)
+        request.user.save()
+
+        return Response({
+            'success': True,
+            'message': 'Password changed successfully. Please login again.'
+        })
+
+
+# ══════════════════════════════════════════════
+# POST /api/auth/verify-email/
+# Verify email with token
+# ══════════════════════════════════════════════
+class VerifyEmailView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        token = request.data.get('token')
+
+        if not token:
+            return Response({
+                'success': False,
+                'message': 'token is required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            verification = EmailVerificationToken.objects.get(
+                token=token,
+                is_used=False
+            )
+        except EmailVerificationToken.DoesNotExist:
+            return Response({
+                'success': False,
+                'message': 'Invalid or already used token.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if verification.expires_at < timezone.now():
+            return Response({
+                'success': False,
+                'message': 'Token has expired. Please request a new one.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Mark user as verified
+        user = verification.user
+        user.is_verified = True
+        user.save()
+
+        # Mark token as used
+        verification.is_used = True
+        verification.save()
+
+        return Response({
+            'success': True,
+            'message': 'Email verified successfully.'
+        })
+
+
+# ══════════════════════════════════════════════
+# POST /api/auth/resend-verification/
+# Resend email verification token
+# ══════════════════════════════════════════════
+class ResendVerificationView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        email = request.data.get('email')
+
+        if not email:
+            return Response({
+                'success': False,
+                'message': 'Email is required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({
+                'success': True,
+                'message': 'If this email exists, a verification token has been sent.'
+            })
+
+        if user.is_verified:
+            return Response({
+                'success': False,
+                'message': 'Email is already verified.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Invalidate old tokens
+        EmailVerificationToken.objects.filter(user=user, is_used=False).update(is_used=True)
+
+        # Create new token
+        token = secrets.token_urlsafe(32)
+        EmailVerificationToken.objects.create(
+            user=user,
+            token=token,
+            expires_at=timezone.now() + timedelta(hours=24)
+        )
+
+        return Response({
+            'success': True,
+            'message': 'Verification token generated.',
+            'verification_token': token,  # Remove this in production
+            'expires_in': '24 hours'
+        })
+
+
+# ══════════════════════════════════════════════
+# DELETE /api/auth/account/
+# Delete own account
+# ══════════════════════════════════════════════
+class DeleteAccountView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        password = request.data.get('password')
+
+        if not password:
+            return Response({
+                'success': False,
+                'message': 'Please confirm your password to delete account.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if not request.user.check_password(password):
+            return Response({
+                'success': False,
+                'message': 'Incorrect password.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        request.user.delete()
+
+        return Response({
+            'success': True,
+            'message': 'Account deleted successfully.'
+        })    

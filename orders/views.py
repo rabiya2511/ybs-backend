@@ -16,7 +16,7 @@ from authentication.permissions import IsAdminOrSuperAdmin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 
-# Default milestones per service (can be customized later)
+# Default milestones per service
 DEFAULT_MILESTONES = [
     {"name": "Order Confirmed", "status": "completed"},
     {"name": "Documents Collected", "status": "pending"},
@@ -27,7 +27,6 @@ DEFAULT_MILESTONES = [
 
 # ══════════════════════════════════════════════
 # POST /api/orders/create/
-# Client creates an order after payment
 # ══════════════════════════════════════════════
 class OrderCreateView(APIView):
     permission_classes = [IsAuthenticated]
@@ -40,14 +39,12 @@ class OrderCreateView(APIView):
                 'errors': serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Get package to calculate pricing
         package = get_object_or_404(Package, pk=request.data.get('package'))
         from decimal import Decimal
         base_amount = package.price
         gst_amount = round(base_amount * Decimal('0.18'), 2)
         total_paid = base_amount + gst_amount
 
-        # Create order
         order = Order.objects.create(
             client=request.user,
             service=package.service,
@@ -60,15 +57,28 @@ class OrderCreateView(APIView):
                if k not in ['service', 'package']}
         )
 
+        # Send notification to client
+        try:
+            from notifications.views import create_notification
+            create_notification(
+                user=request.user,
+                title=f'Order {order.order_number} Created!',
+                body=f'Your order for {order.service.name} has been created successfully. Please complete payment to activate.',
+                notification_type='ORDER_UPDATE',
+                related_order_id=order.id
+            )
+        except Exception as e:
+            print(f"Notification error: {e}")
+
         return Response({
             'success': True,
             'message': f'Order {order.order_number} created successfully!',
             'data': OrderSerializer(order).data
         }, status=status.HTTP_201_CREATED)
 
+
 # ══════════════════════════════════════════════
 # GET /api/orders/my-orders/
-# Client views their own orders
 # ══════════════════════════════════════════════
 class MyOrdersView(APIView):
     permission_classes = [IsAuthenticated]
@@ -82,9 +92,9 @@ class MyOrdersView(APIView):
             'data': serializer.data
         })
 
+
 # ══════════════════════════════════════════════
 # GET /api/orders/my-orders/<id>/
-# Client views a single order detail
 # ══════════════════════════════════════════════
 class MyOrderDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -97,9 +107,9 @@ class MyOrderDetailView(APIView):
             'data': serializer.data
         })
 
+
 # ══════════════════════════════════════════════
 # GET /api/orders/admin/
-# Admin views all orders with filters
 # ══════════════════════════════════════════════
 class AdminOrderListView(APIView):
     permission_classes = [IsAdminOrSuperAdmin]
@@ -107,7 +117,6 @@ class AdminOrderListView(APIView):
     def get(self, request):
         orders = Order.objects.all()
 
-        # Filters
         status_filter = request.query_params.get('status')
         service_filter = request.query_params.get('service')
         provider_filter = request.query_params.get('provider')
@@ -126,9 +135,9 @@ class AdminOrderListView(APIView):
             'data': serializer.data
         })
 
+
 # ══════════════════════════════════════════════
 # GET /api/orders/admin/<id>/
-# Admin views single order detail
 # ══════════════════════════════════════════════
 class AdminOrderDetailView(APIView):
     permission_classes = [IsAdminOrSuperAdmin]
@@ -141,9 +150,9 @@ class AdminOrderDetailView(APIView):
             'data': serializer.data
         })
 
+
 # ══════════════════════════════════════════════
 # PATCH /api/orders/admin/<id>/status/
-# Admin updates order status
 # ══════════════════════════════════════════════
 class AdminOrderStatusView(APIView):
     permission_classes = [IsAdminOrSuperAdmin]
@@ -155,6 +164,20 @@ class AdminOrderStatusView(APIView):
         )
         if serializer.is_valid():
             serializer.save()
+
+            # Send notification to client
+            try:
+                from notifications.views import create_notification
+                create_notification(
+                    user=order.client,
+                    title=f'Order {order.order_number} Updated',
+                    body=f'Your order status has been updated to {order.status}.',
+                    notification_type='ORDER_UPDATE',
+                    related_order_id=order.id
+                )
+            except Exception as e:
+                print(f"Notification error: {e}")
+
             return Response({
                 'success': True,
                 'message': f'Order {order.order_number} status updated.',
@@ -165,9 +188,9 @@ class AdminOrderStatusView(APIView):
             'errors': serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
 
+
 # ══════════════════════════════════════════════
 # PATCH /api/orders/admin/<id>/milestone/
-# Admin updates a specific milestone
 # ══════════════════════════════════════════════
 class AdminMilestoneUpdateView(APIView):
     permission_classes = [IsAdminOrSuperAdmin]
@@ -192,7 +215,6 @@ class AdminMilestoneUpdateView(APIView):
                 'message': 'Invalid milestone index.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Update milestone
         milestones[index]['status'] = new_status
         if new_status == 'completed':
             milestones[index]['completed_at'] = timezone.now().isoformat()
@@ -200,15 +222,28 @@ class AdminMilestoneUpdateView(APIView):
         order.milestones = milestones
         order.save()
 
+        # Send notification to client
+        try:
+            from notifications.views import create_notification
+            create_notification(
+                user=order.client,
+                title=f'Milestone Completed!',
+                body=f'Milestone "{milestones[index]["name"]}" for order {order.order_number} has been completed.',
+                notification_type='MILESTONE',
+                related_order_id=order.id
+            )
+        except Exception as e:
+            print(f"Notification error: {e}")
+
         return Response({
             'success': True,
-            'message': f'Milestone updated successfully.',
+            'message': 'Milestone updated successfully.',
             'data': OrderSerializer(order).data
         })
 
+
 # ══════════════════════════════════════════════
 # PATCH /api/orders/admin/<id>/assign-provider/
-# Admin assigns a provider to an order
 # ══════════════════════════════════════════════
 class AdminAssignProviderView(APIView):
     permission_classes = [IsAdminOrSuperAdmin]
@@ -230,15 +265,28 @@ class AdminAssignProviderView(APIView):
         order.status = 'Active'
         order.save()
 
+        # Send notification to client
+        try:
+            from notifications.views import create_notification
+            create_notification(
+                user=order.client,
+                title='Provider Assigned!',
+                body=f'A provider has been assigned to your order {order.order_number}. Work will begin shortly.',
+                notification_type='ORDER_UPDATE',
+                related_order_id=order.id
+            )
+        except Exception as e:
+            print(f"Notification error: {e}")
+
         return Response({
             'success': True,
             'message': f'Provider {provider.name} assigned to order {order.order_number}.',
             'data': OrderSerializer(order).data
         })
 
+
 # ══════════════════════════════════════════════
 # POST /api/orders/admin/<id>/documents/
-# Admin uploads a document/deliverable
 # ══════════════════════════════════════════════
 class AdminDocumentUploadView(APIView):
     permission_classes = [IsAdminOrSuperAdmin]
@@ -264,21 +312,34 @@ class AdminDocumentUploadView(APIView):
             is_deliverable=is_deliverable
         )
 
+        # Send notification to client
+        try:
+            from notifications.views import create_notification
+            create_notification(
+                user=order.client,
+                title='Document Uploaded!',
+                body=f'A new document "{name}" has been uploaded for your order {order.order_number}.',
+                notification_type='DOCUMENT',
+                related_order_id=order.id
+            )
+        except Exception as e:
+            print(f"Notification error: {e}")
+
         return Response({
             'success': True,
             'message': 'Document uploaded successfully.',
             'data': OrderDocumentSerializer(doc).data
         }, status=status.HTTP_201_CREATED)
 
+
 # ══════════════════════════════════════════════
 # GET /api/orders/admin/stats/
-# Admin dashboard stats
 # ══════════════════════════════════════════════
 class AdminOrderStatsView(APIView):
     permission_classes = [IsAdminOrSuperAdmin]
 
     def get(self, request):
-        from django.db.models import Sum, Count
+        from django.db.models import Sum
 
         total_revenue = Order.objects.filter(
             status='Done'
@@ -297,5 +358,3 @@ class AdminOrderStatsView(APIView):
                 'total_orders': total_orders,
             }
         })
-    
-
