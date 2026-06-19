@@ -51,7 +51,9 @@ INSTALLED_APPS = [
     'checkout',
     'projects',
     'providers',
-
+    'tasks',
+    'clients'
+    
 ]
 
 MIDDLEWARE = [

@@ -33,6 +33,10 @@ urlpatterns = [
 
     # Providers APIs
     path('api/providers/', include('providers.urls')),
+    #Tasks APIs
+    path('api/tasks/', include('tasks.urls')),
+    # Clients APIs
+    path('api/clients/', include('clients.urls')),
 ]
 
 # Serve uploaded files in development
