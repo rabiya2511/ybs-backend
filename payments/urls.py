@@ -10,15 +10,19 @@ from .views import (
     UseWalletView,
     AdminCreateCouponView,
     AdminCouponListView,
+    AdminUpdateCouponView,
+    AdminDeleteCouponView,
     TransactionListView,
     TransactionDetailView,
     VerifyPaymentView,
     RazorpayWebhookView,
     StripeWebhookView,
+    CreatePaymentView,
 )
 
 urlpatterns = [
     # ── Client Routes ─────────────────────────────
+    path('create/', CreatePaymentView.as_view(), name='create-payment'),
     path('initiate/', InitiatePaymentView.as_view(), name='initiate-payment'),
     path('confirm/', ConfirmPaymentView.as_view(), name='confirm-payment'),
     path('verify/', VerifyPaymentView.as_view(), name='verify-payment'),
@@ -38,4 +42,6 @@ urlpatterns = [
     path('admin/<uuid:pk>/refund/', AdminRefundView.as_view(), name='admin-refund'),
     path('admin/coupons/', AdminCouponListView.as_view(), name='admin-coupons'),
     path('admin/coupons/create/', AdminCreateCouponView.as_view(), name='admin-create-coupon'),
+    path('admin/coupons/<int:pk>/', AdminUpdateCouponView.as_view(), name='admin-update-coupon'),
+    path('admin/coupons/<int:pk>/delete/', AdminDeleteCouponView.as_view(), name='admin-delete-coupon'),
 ]

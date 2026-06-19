@@ -656,3 +656,102 @@ class StripeWebhookView(APIView):
                 pass
 
         return Response({'status': 'ok'})
+# ══════════════════════════════════════════════
+# POST /api/payments/create/
+# Spec-style payment create (alias for initiate)
+# ══════════════════════════════════════════════
+class CreatePaymentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        order_id = request.data.get('order_id')
+        payment_method = request.data.get('payment_method', 'UPI')
+
+        if not order_id:
+            return Response({
+                'success': False,
+                'message': 'order_id is required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        order = get_object_or_404(Order, pk=order_id, client=request.user)
+
+        existing = Payment.objects.filter(order=order, status='Success').first()
+        if existing:
+            return Response({
+                'success': False,
+                'message': 'This order has already been paid.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        transaction_id = 'TXN' + uuid.uuid4().hex[:12].upper()
+
+        payment = Payment.objects.create(
+            order=order,
+            client=request.user,
+            amount=order.base_amount,
+            gst_amount=order.gst_amount,
+            total_amount=order.total_paid,
+            payment_method=payment_method,
+            transaction_id=transaction_id,
+            status='Pending'
+        )
+
+        return Response({
+            'success': True,
+            'message': 'Payment created successfully.',
+            'data': {
+                'payment_id': str(payment.id),
+                'transaction_id': transaction_id,
+                'amount': str(payment.total_amount),
+                'currency': 'INR',
+                'order_number': order.order_number,
+                'payment_method': payment_method,
+            }
+        }, status=status.HTTP_201_CREATED)
+
+
+# ══════════════════════════════════════════════
+# PUT /api/payments/admin/coupons/<id>/
+# Admin updates a coupon
+# ══════════════════════════════════════════════
+class AdminUpdateCouponView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def put(self, request, pk):
+        coupon = get_object_or_404(Coupon, pk=pk)
+        coupon.code = request.data.get('code', coupon.code).upper()
+        coupon.discount_type = request.data.get('discount_type', coupon.discount_type)
+        coupon.discount_value = request.data.get('discount_value', coupon.discount_value)
+        coupon.min_order_amount = request.data.get('min_order_amount', coupon.min_order_amount)
+        coupon.usage_limit = request.data.get('usage_limit', coupon.usage_limit)
+        coupon.is_active = request.data.get('is_active', coupon.is_active)
+        coupon.expires_at = request.data.get('expires_at', coupon.expires_at)
+        coupon.save()
+
+        return Response({
+            'success': True,
+            'message': f'Coupon {coupon.code} updated successfully.',
+            'data': {
+                'id': coupon.id,
+                'code': coupon.code,
+                'discount_type': coupon.discount_type,
+                'discount_value': str(coupon.discount_value),
+                'is_active': coupon.is_active,
+            }
+        })
+
+
+# ══════════════════════════════════════════════
+# DELETE /api/payments/admin/coupons/<id>/
+# Admin deletes a coupon
+# ══════════════════════════════════════════════
+class AdminDeleteCouponView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def delete(self, request, pk):
+        coupon = get_object_or_404(Coupon, pk=pk)
+        code = coupon.code
+        coupon.delete()
+        return Response({
+            'success': True,
+            'message': f'Coupon {code} deleted successfully.'
+        })

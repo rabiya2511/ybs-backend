@@ -23,6 +23,8 @@ urlpatterns = [
      path('api/checkout/', include('checkout.urls')), 
     # Accounting APIs
     path('api/accounting/', include('accounting.urls')),
+    # Projects APIs
+    path('api/projects/', include('projects.urls')),
 ]
 
 # Serve uploaded files in development

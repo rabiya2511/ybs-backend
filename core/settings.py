@@ -49,6 +49,8 @@ INSTALLED_APPS = [
     'accounting',
     'notifications', 
     'checkout',
+    'projects',
+
 ]
 
 MIDDLEWARE = [
