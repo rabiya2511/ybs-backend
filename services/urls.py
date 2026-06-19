@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    ServiceBulkUploadView,
     ServiceListView,
     ServiceDetailView,
     ServiceCreateView,
@@ -30,4 +31,5 @@ urlpatterns = [
     path('admin/packages/create/', PackageCreateView.as_view(), name='package-create'),
     path('admin/packages/<uuid:pk>/update/', PackageUpdateView.as_view(), name='package-update'),
     path('admin/packages/<uuid:pk>/delete/', PackageDeleteView.as_view(), name='package-delete'),
+    path('admin/bulk-upload/', ServiceBulkUploadView.as_view(), name='service-bulk-upload'),
 ]

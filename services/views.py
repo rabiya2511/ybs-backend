@@ -295,3 +295,55 @@ class ServicePackagesView(APIView):
             'count': len(data),
             'data': data
         })
+# ══════════════════════════════════════════════
+# POST /api/services/admin/bulk-upload/
+# Admin bulk uploads multiple services at once
+# ══════════════════════════════════════════════
+class ServiceBulkUploadView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def post(self, request):
+        services_data = request.data.get('services')
+
+        if not services_data or not isinstance(services_data, list):
+            return Response({
+                'success': False,
+                'message': 'services must be a non-empty list of service objects.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        created = []
+        errors = []
+
+        for index, item in enumerate(services_data):
+            name = item.get('name')
+            category = item.get('category')
+            starting_price = item.get('starting_price')
+
+            if not name or not category or starting_price is None:
+                errors.append({
+                    'index': index,
+                    'message': 'name, category and starting_price are required.'
+                })
+                continue
+
+            service = Service.objects.create(
+                name=name,
+                category=category,
+                description=item.get('description', ''),
+                icon=item.get('icon', ''),
+                starting_price=starting_price,
+                is_active=item.get('is_active', True),
+                is_featured=item.get('is_featured', False),
+            )
+            created.append({
+                'id': str(service.id),
+                'name': service.name,
+                'category': service.category,
+            })
+
+        return Response({
+            'success': True,
+            'message': f'{len(created)} services created, {len(errors)} failed.',
+            'created': created,
+            'errors': errors,
+        }, status=status.HTTP_201_CREATED)
