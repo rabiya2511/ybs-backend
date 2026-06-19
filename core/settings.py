@@ -52,7 +52,8 @@ INSTALLED_APPS = [
     'projects',
     'providers',
     'tasks',
-    'clients'
+    'clients',
+    'provider_portal',
     
 ]
 

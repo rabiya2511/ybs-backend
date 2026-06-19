@@ -13,6 +13,11 @@ from .views import (
     PopularServicesView,
     ServicesByCategoryView,
     ServicePackagesView,
+    CategoryListView,
+    CategoryCreateView,
+    CategoryDetailView,
+    CategoryUpdateView,
+    CategoryDeleteView,
 )
 
 urlpatterns = [
@@ -23,6 +28,10 @@ urlpatterns = [
     path('category/<str:category>/', ServicesByCategoryView.as_view(), name='services-by-category'),
     path('<uuid:pk>/', ServiceDetailView.as_view(), name='service-detail'),
     path('<uuid:pk>/packages/', ServicePackagesView.as_view(), name='service-packages'),
+    path('categories/', CategoryListView.as_view(), name='category-list'),
+    path('categories/<uuid:pk>/', CategoryDetailView.as_view(), name='category-detail'),
+
+
 
     # ── Admin Routes ──────────────────────────────
     path('admin/create/', ServiceCreateView.as_view(), name='service-create'),
@@ -32,4 +41,7 @@ urlpatterns = [
     path('admin/packages/<uuid:pk>/update/', PackageUpdateView.as_view(), name='package-update'),
     path('admin/packages/<uuid:pk>/delete/', PackageDeleteView.as_view(), name='package-delete'),
     path('admin/bulk-upload/', ServiceBulkUploadView.as_view(), name='service-bulk-upload'),
-]
+    path('admin/categories/create/', CategoryCreateView.as_view(), name='category-create'),
+    path('admin/categories/<uuid:pk>/update/', CategoryUpdateView.as_view(), name='category-update'),
+    path('admin/categories/<uuid:pk>/delete/', CategoryDeleteView.as_view(), name='category-delete'),
+]   
