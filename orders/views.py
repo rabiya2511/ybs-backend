@@ -4,6 +4,8 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from .models import Order, OrderDocument
+import csv
+from django.http import HttpResponse
 from .serializers import (
     OrderSerializer,
     OrderCreateSerializer,
@@ -358,3 +360,217 @@ class AdminOrderStatsView(APIView):
                 'total_orders': total_orders,
             }
         })
+
+
+# ══════════════════════════════════════════════
+# PUT /api/orders/admin/<id>/update/
+# ══════════════════════════════════════════════
+class AdminOrderUpdateView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def put(self, request, pk):
+        order = get_object_or_404(Order, pk=pk)
+        serializer = OrderSerializer(order, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'success': True,
+                'message': f'Order {order.order_number} updated successfully.',
+                'data': serializer.data
+            })
+        return Response({
+            'success': False,
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ══════════════════════════════════════════════
+# DELETE /api/orders/admin/<id>/delete/
+# ══════════════════════════════════════════════
+class AdminOrderDeleteView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def delete(self, request, pk):
+        order = get_object_or_404(Order, pk=pk)
+        order_number = order.order_number
+        order.delete()
+
+        return Response({
+            'success': True,
+            'message': f'Order {order_number} deleted successfully.'
+        }, status=status.HTTP_200_OK)
+
+
+# ══════════════════════════════════════════════
+# POST /api/orders/cancel/
+# ══════════════════════════════════════════════
+class OrderCancelView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        order_id = request.data.get('order_id')
+        reason   = request.data.get('reason', '')
+
+        if not order_id:
+            return Response({
+                'success': False,
+                'message': 'order_id is required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Client can cancel their own order, admin can cancel any
+        if request.user.role in ('admin', 'superadmin'):
+            order = get_object_or_404(Order, pk=order_id)
+        else:
+            order = get_object_or_404(Order, pk=order_id, client=request.user)
+
+        # Only allow cancellation if not already done/cancelled
+        if order.status in ('Done', 'Cancelled'):
+            return Response({
+                'success': False,
+                'message': f'Cannot cancel an order with status: {order.status}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        order.status = 'Cancelled'
+        order.cancellation_reason = reason
+        order.cancelled_at = timezone.now()
+        order.save()
+
+        # Notify client
+        try:
+            from notifications.views import create_notification
+            create_notification(
+                user=order.client,
+                title=f'Order {order.order_number} Cancelled',
+                body=f'Your order has been cancelled. Reason: {reason}' if reason else f'Your order {order.order_number} has been cancelled.',
+                notification_type='ORDER_UPDATE',
+                related_order_id=order.id
+            )
+        except Exception as e:
+            print(f"Notification error: {e}")
+
+        return Response({
+            'success': True,
+            'message': f'Order {order.order_number} cancelled successfully.',
+            'data': OrderSerializer(order).data
+        })
+
+
+# ══════════════════════════════════════════════
+# GET /api/orders/pending/
+# ══════════════════════════════════════════════
+class PendingOrdersView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        orders = Order.objects.filter(
+            status__in=['Pending', 'Queued']
+        ).order_by('-created_at')
+
+        serializer = OrderSerializer(orders, many=True)
+        return Response({
+            'success': True,
+            'count': orders.count(),
+            'data': serializer.data
+        })
+
+
+# ══════════════════════════════════════════════
+# GET /api/orders/completed/
+# ══════════════════════════════════════════════
+class CompletedOrdersView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        orders = Order.objects.filter(
+            status='Done'
+        ).order_by('-created_at')
+
+        serializer = OrderSerializer(orders, many=True)
+        return Response({
+            'success': True,
+            'count': orders.count(),
+            'data': serializer.data
+        })
+
+
+# ══════════════════════════════════════════════
+# GET /api/orders/active/
+# ══════════════════════════════════════════════
+class ActiveOrdersView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        orders = Order.objects.filter(
+            status='Active'
+        ).order_by('-created_at')
+
+        serializer = OrderSerializer(orders, many=True)
+        return Response({
+            'success': True,
+            'count': orders.count(),
+            'data': serializer.data
+        })
+
+
+# ══════════════════════════════════════════════
+# GET /api/orders/export/
+# ══════════════════════════════════════════════
+class OrderExportView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        orders = Order.objects.all().order_by('-created_at')
+
+        # Optional filters before export
+        status_filter = request.query_params.get('status')
+        from_date     = request.query_params.get('from')
+        to_date       = request.query_params.get('to')
+
+        if status_filter:
+            orders = orders.filter(status=status_filter)
+        if from_date:
+            orders = orders.filter(created_at__date__gte=from_date)
+        if to_date:
+            orders = orders.filter(created_at__date__lte=to_date)
+
+        # Build CSV response
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="orders_export.csv"'
+
+        writer = csv.writer(response)
+
+        # Header row
+        writer.writerow([
+            'Order Number',
+            'Client Name',
+            'Client Email',
+            'Service',
+            'Package',
+            'Status',
+            'Base Amount',
+            'GST Amount',
+            'Total Paid',
+            'Provider',
+            'Created At',
+            'Expected Completion',
+        ])
+
+        # Data rows
+        for o in orders:
+            writer.writerow([
+                o.order_number,
+                o.client.name if hasattr(o.client, 'name') else o.client.email,
+                o.client.email,
+                o.service.name if o.service else '',
+                o.package.name if o.package else '',
+                o.status,
+                o.base_amount,
+                o.gst_amount,
+                o.total_paid,
+                o.provider.name if o.provider and hasattr(o.provider, 'name') else '',
+                o.created_at.strftime('%Y-%m-%d %H:%M'),
+                o.expected_completion_date or '',
+            ])
+
+        return response

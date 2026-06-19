@@ -10,6 +10,14 @@ from .views import (
     AdminAssignProviderView,
     AdminDocumentUploadView,
     AdminOrderStatsView,
+    AdminOrderUpdateView,
+    AdminOrderDeleteView,
+    OrderCancelView,
+    PendingOrdersView,
+    CompletedOrdersView,
+    ActiveOrdersView,
+    OrderExportView,
+
 )
 
 urlpatterns = [
@@ -36,4 +44,12 @@ urlpatterns = [
     path('admin/<uuid:pk>/assign-provider/', AdminAssignProviderView.as_view(), name='admin-assign-provider'),
     # Admin uploads documents or deliverables for client
     path('admin/<uuid:pk>/documents/', AdminDocumentUploadView.as_view(), name='admin-upload-doc'),
+    path('admin/<uuid:pk>/update/', AdminOrderUpdateView.as_view()),
+    path('admin/<uuid:pk>/delete/', AdminOrderDeleteView.as_view()),
+    path('cancel/', OrderCancelView.as_view()),
+    path('pending/', PendingOrdersView.as_view()),
+    path('completed/', CompletedOrdersView.as_view()),
+    path('active/', ActiveOrdersView.as_view()),
+    path('export/', OrderExportView.as_view()),
+
 ]

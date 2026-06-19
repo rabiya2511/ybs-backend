@@ -68,6 +68,10 @@ class Order(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # orders/models.py — add to Order model
+    cancellation_reason = models.TextField(blank=True, null=True)
+    cancelled_at = models.DateTimeField(blank=True, null=True)
+
     class Meta:
         ordering = ['-created_at']
 
