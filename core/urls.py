@@ -15,16 +15,24 @@ urlpatterns = [
 
     # Orders APIs
     path('api/orders/', include('orders.urls')),
+
     # Payments APIs
     path('api/payments/', include('payments.urls')),
-    # notifications APIs
+
+    # Notifications APIs
     path('api/notifications/', include('notifications.urls')),
+
     # Checkout APIs
-     path('api/checkout/', include('checkout.urls')), 
+    path('api/checkout/', include('checkout.urls')),
+
     # Accounting APIs
     path('api/accounting/', include('accounting.urls')),
+
     # Projects APIs
     path('api/projects/', include('projects.urls')),
+
+    # Providers APIs
+    path('api/providers/', include('providers.urls')),
 ]
 
 # Serve uploaded files in development
