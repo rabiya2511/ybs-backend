@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'site_settings',
     'bills',
     'dashboards',
+    'ai_assistant',
     
 ]
 

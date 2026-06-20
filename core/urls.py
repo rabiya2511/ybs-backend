@@ -50,6 +50,7 @@ urlpatterns = [
     path('api/bills/', include('bills.urls')),
     # Dashboards APIs
     path('api/dashboard/', include('dashboards.urls')),
+    path('api/ai-assistant/', include('ai_assistant.urls')),
 ]
 
 # Serve uploaded files in development
