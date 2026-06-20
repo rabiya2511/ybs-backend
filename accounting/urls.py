@@ -4,6 +4,7 @@ from .views import (
     InvoiceDetailView,
     MarkInvoicePaidView,
     SendInvoiceView,
+    InvoicePDFView,  # add this
     AdminInvoiceListView,
     AdminCreateInvoiceView,
     AdminUpdateInvoiceView,
@@ -22,7 +23,6 @@ from .views import (
     GSTReportView,
     MonthlySummaryReportView,
 )
-
 urlpatterns = [
     # ── Client Routes ─────────────────────────────
     path('invoices/', MyInvoicesView.as_view(), name='my-invoices'),
@@ -35,6 +35,7 @@ urlpatterns = [
     path('admin/invoices/create/', AdminCreateInvoiceView.as_view(), name='admin-create-invoice'),
     path('admin/invoices/<uuid:pk>/', AdminUpdateInvoiceView.as_view(), name='admin-update-invoice'),
     path('admin/invoices/<uuid:pk>/delete/', AdminDeleteInvoiceView.as_view(), name='admin-delete-invoice'),
+    path('invoices/<uuid:pk>/pdf/', InvoicePDFView.as_view(), name='invoice-pdf'),
 
     # ── Admin Expense Routes ───────────────────────
     path('admin/expenses/', AdminExpenseListView.as_view(), name='admin-expenses'),

@@ -611,3 +611,46 @@ class MonthlySummaryReportView(APIView):
             'count': len(data),
             'data': data
         })
+    
+# ══════════════════════════════════════════════
+# GET /api/accounting/invoices/<id>/pdf/
+# Get invoice data formatted for PDF generation
+# ══════════════════════════════════════════════
+class InvoicePDFView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        invoice = get_object_or_404(Invoice, pk=pk)
+
+        # Allow client to view their own invoice, or admin to view any
+        if request.user.role == 'CLIENT' and invoice.client != request.user:
+            return Response({
+                'success': False,
+                'message': 'You do not have permission to view this invoice.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        return Response({
+            'success': True,
+            'data': {
+                'invoice_number': invoice.invoice_number,
+                'issue_date': invoice.issue_date,
+                'due_date': invoice.due_date,
+                'bill_to': {
+                    'name': invoice.client.name,
+                    'email': invoice.client.email,
+                    'company_name': invoice.client.company_name,
+                    'gstin': invoice.client.gstin,
+                },
+                'line_items': invoice.line_items,
+                'subtotal': str(invoice.subtotal),
+                'gst_amount': str(invoice.gst_amount),
+                'discount': str(invoice.discount),
+                'total': str(invoice.total),
+                'status': invoice.status,
+                'notes': invoice.notes,
+                'company_details': {
+                    'name': 'YBS - The Y Business Services',
+                    'address': 'India',
+                },
+            }
+        })
