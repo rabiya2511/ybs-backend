@@ -54,6 +54,8 @@ INSTALLED_APPS = [
     'tasks',
     'clients',
     'provider_portal',
+    'referrals',
+    'documents',
     
 ]
 

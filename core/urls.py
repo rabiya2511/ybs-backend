@@ -39,6 +39,10 @@ urlpatterns = [
     path('api/clients/', include('clients.urls')),
     # Provider Portal APIs
     path('api/provider-portal/', include('provider_portal.urls')),
+    # Referrals APIs
+    path('api/referrals/', include('referrals.urls')),  
+    # Documents APIs
+    path('api/documents/', include('documents.urls')),
 ]
 
 # Serve uploaded files in development
