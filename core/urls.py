@@ -43,6 +43,8 @@ urlpatterns = [
     path('api/referrals/', include('referrals.urls')),  
     # Documents APIs
     path('api/documents/', include('documents.urls')),
+    # Expenses APIs
+    path('api/expenses/', include('expenses.urls')),
 ]
 
 # Serve uploaded files in development

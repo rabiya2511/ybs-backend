@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'provider_portal',
     'referrals',
     'documents',
+    'expenses',
     
 ]
 
