@@ -22,6 +22,11 @@ from .views import (
     ProfitLossReportView,
     GSTReportView,
     MonthlySummaryReportView,
+    RevenueReportView,
+    BalanceSheetReportView,
+    CashFlowReportView,
+    ProviderPayoutsReportView,
+    ClientRevenueReportView,
 )
 urlpatterns = [
     # ── Client Routes ─────────────────────────────
@@ -55,4 +60,9 @@ urlpatterns = [
     path('admin/reports/profit-loss/', ProfitLossReportView.as_view(), name='profit-loss-report'),
     path('admin/reports/gst/', GSTReportView.as_view(), name='gst-report'),
     path('admin/reports/monthly-summary/', MonthlySummaryReportView.as_view(), name='monthly-summary-report'),
+    path('admin/reports/revenue/', RevenueReportView.as_view(), name='revenue-report'),
+    path('admin/reports/balance-sheet/', BalanceSheetReportView.as_view(), name='balance-sheet-report'),
+    path('admin/reports/cash-flow/', CashFlowReportView.as_view(), name='cash-flow-report'),
+    path('admin/reports/provider-payouts/', ProviderPayoutsReportView.as_view(), name='provider-payouts-report'),
+    path('admin/reports/client-revenue/', ClientRevenueReportView.as_view(), name='client-revenue-report'),
 ]

@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.db.models import Sum, Count
 from decimal import Decimal
 from .models import Invoice, Bill, Expense
 from authentication.permissions import IsAdminOrSuperAdmin
@@ -653,4 +654,195 @@ class InvoicePDFView(APIView):
                     'address': 'India',
                 },
             }
+        })
+    
+# ══════════════════════════════════════════════
+# GET /api/accounting/admin/reports/revenue/
+# Standalone Revenue Report
+# ══════════════════════════════════════════════
+class RevenueReportView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        month = request.query_params.get('month')
+        year = request.query_params.get('year')
+
+        invoices = Invoice.objects.filter(status='Paid')
+        if month and year:
+            invoices = invoices.filter(paid_at__month=month, paid_at__year=year)
+
+        total_revenue = invoices.aggregate(total=Sum('total'))['total'] or 0
+        invoice_count = invoices.count()
+
+        return Response({
+            'success': True,
+            'data': {
+                'total_revenue': str(total_revenue),
+                'invoice_count': invoice_count,
+                'month': month,
+                'year': year,
+            }
+        })
+
+
+# ══════════════════════════════════════════════
+# GET /api/accounting/admin/reports/balance-sheet/
+# Balance Sheet - Assets vs Liabilities snapshot
+# ══════════════════════════════════════════════
+class BalanceSheetReportView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        # Assets: cash collected (paid invoices) + pending receivables
+        cash_collected = Invoice.objects.filter(
+            status='Paid'
+        ).aggregate(total=Sum('total'))['total'] or 0
+
+        receivables = Invoice.objects.filter(
+            status__in=['Sent', 'Due', 'Overdue']
+        ).aggregate(total=Sum('total'))['total'] or 0
+
+        total_assets = Decimal(str(cash_collected)) + Decimal(str(receivables))
+
+        # Liabilities: unpaid bills + pending provider payouts
+        from providers.models import ProviderPayout
+        pending_bills = Bill.objects.filter(
+            status='Pending'
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
+        pending_payouts = ProviderPayout.objects.filter(
+            status='Pending'
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
+        total_liabilities = Decimal(str(pending_bills)) + Decimal(str(pending_payouts))
+
+        net_worth = total_assets - total_liabilities
+
+        return Response({
+            'success': True,
+            'data': {
+                'assets': {
+                    'cash_collected': str(cash_collected),
+                    'receivables': str(receivables),
+                    'total_assets': str(total_assets),
+                },
+                'liabilities': {
+                    'pending_bills': str(pending_bills),
+                    'pending_provider_payouts': str(pending_payouts),
+                    'total_liabilities': str(total_liabilities),
+                },
+                'net_worth': str(net_worth),
+            }
+        })
+
+
+# ══════════════════════════════════════════════
+# GET /api/accounting/admin/reports/cash-flow/
+# Cash Flow Report - cash in vs cash out
+# ══════════════════════════════════════════════
+class CashFlowReportView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        month = request.query_params.get('month')
+        year = request.query_params.get('year')
+
+        invoices = Invoice.objects.filter(status='Paid')
+        expenses = Expense.objects.all()
+        bills = Bill.objects.filter(status='Paid')
+
+        if month and year:
+            invoices = invoices.filter(paid_at__month=month, paid_at__year=year)
+            expenses = expenses.filter(date__month=month, date__year=year)
+            bills = bills.filter(paid_at__month=month, paid_at__year=year)
+
+        cash_in = invoices.aggregate(total=Sum('total'))['total'] or 0
+        cash_out_expenses = expenses.aggregate(total=Sum('amount'))['total'] or 0
+        cash_out_bills = bills.aggregate(total=Sum('amount'))['total'] or 0
+
+        total_cash_out = Decimal(str(cash_out_expenses)) + Decimal(str(cash_out_bills))
+        net_cash_flow = Decimal(str(cash_in)) - total_cash_out
+
+        return Response({
+            'success': True,
+            'data': {
+                'cash_in': str(cash_in),
+                'cash_out_expenses': str(cash_out_expenses),
+                'cash_out_bills': str(cash_out_bills),
+                'total_cash_out': str(total_cash_out),
+                'net_cash_flow': str(net_cash_flow),
+                'month': month,
+                'year': year,
+            }
+        })
+
+
+# ══════════════════════════════════════════════
+# GET /api/accounting/admin/reports/provider-payouts/
+# Total payouts made to providers
+# ══════════════════════════════════════════════
+class ProviderPayoutsReportView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        from providers.models import ProviderPayout
+
+        payouts = ProviderPayout.objects.select_related('provider__user')
+
+        total_paid = payouts.filter(status='Paid').aggregate(
+            total=Sum('amount'))['total'] or 0
+        total_pending = payouts.filter(status='Pending').aggregate(
+            total=Sum('amount'))['total'] or 0
+
+        by_provider = payouts.values(
+            'provider__user__name'
+        ).annotate(
+            total_amount=Sum('amount'),
+            payout_count=Count('id')
+        ).order_by('-total_amount')
+
+        data = [{
+            'provider_name': p['provider__user__name'],
+            'total_amount': str(p['total_amount']),
+            'payout_count': p['payout_count'],
+        } for p in by_provider]
+
+        return Response({
+            'success': True,
+            'data': {
+                'total_paid': str(total_paid),
+                'total_pending': str(total_pending),
+                'by_provider': data,
+            }
+        })
+
+
+# ══════════════════════════════════════════════
+# GET /api/accounting/admin/reports/client-revenue/
+# Revenue broken down by client
+# ══════════════════════════════════════════════
+class ClientRevenueReportView(APIView):
+    permission_classes = [IsAdminOrSuperAdmin]
+
+    def get(self, request):
+        invoices = Invoice.objects.filter(status='Paid').select_related('client')
+
+        by_client = invoices.values(
+            'client__name', 'client__email'
+        ).annotate(
+            total_revenue=Sum('total'),
+            invoice_count=Count('id')
+        ).order_by('-total_revenue')
+
+        data = [{
+            'client_name': c['client__name'],
+            'client_email': c['client__email'],
+            'total_revenue': str(c['total_revenue']),
+            'invoice_count': c['invoice_count'],
+        } for c in by_client]
+
+        return Response({
+            'success': True,
+            'count': len(data),
+            'data': data
         })
