@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'referrals',
     'documents',
     'expenses',
+    'site_settings',
     
 ]
 
