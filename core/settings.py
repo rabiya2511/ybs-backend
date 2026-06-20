@@ -58,6 +58,8 @@ INSTALLED_APPS = [
     'documents',
     'expenses',
     'site_settings',
+    'bills',
+    'dashboards',
     
 ]
 

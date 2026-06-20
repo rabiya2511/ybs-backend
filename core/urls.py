@@ -47,6 +47,9 @@ urlpatterns = [
     path('api/expenses/', include('expenses.urls')),
     # Site Settings APIs
     path('api/settings/', include('site_settings.urls')),
+    path('api/bills/', include('bills.urls')),
+    # Dashboards APIs
+    path('api/dashboard/', include('dashboards.urls')),
 ]
 
 # Serve uploaded files in development
